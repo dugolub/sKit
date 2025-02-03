@@ -432,7 +432,7 @@ glibc_apps
 glibc_gconv
 isl
 mpc
-linux-6.6.y_api_headers.tcz
+linux-6.6.y_api_headers
 binutils
 make
 sed
