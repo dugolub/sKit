@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# v1.5_dg-pCP10
+#
 # soundcheck's tuning kit - pCP  - sKit-manager.sh
 # 
 # for RPi4 and related CM modules
@@ -189,10 +191,10 @@ env_set() {
     PERM_BASE="755"
     OWNER_BASE="tc.staff"
    
-    REPO_PCP1="https://repo.picoreplayer.org/repo"
+    REPO_PCP1="https://repo.pcplayer.org"
     REPO_PCP2="http://picoreplayer.sourceforge.net/tcz_repo"
     REPO_PCP="$REPO_PCP1"
-    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
+    REPO_sKit="https://github.com/dugolub/sKit/tree/dg"
     TIMEOUT=120
 
     sKit="sKit-manager.sh sKit-custom-squeezelite.sh sKit-led-manager.sh sKit-tweaks sKit-src-manager.sh sKit-restore.sh sKit-check.sh"
