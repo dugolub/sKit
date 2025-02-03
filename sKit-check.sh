@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# v1.5_dg-pCP10
+#
 # soundcheck's tuning kit - pCP - sKit-check.sh
 # checks the tuning status 
 # for RPi4 and related CM modules
