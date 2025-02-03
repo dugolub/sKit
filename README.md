@@ -1,4 +1,4 @@
-v1.5(dg-pCP10)
+v1.5_dg-pCP10
 **************************
 
 # soundcheck's tuning kit  (sKit)  1.5   Aug-07-2021
