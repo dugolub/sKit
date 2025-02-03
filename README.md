@@ -1,3 +1,6 @@
+v1.5(dg-pCP10)
+**************************
+
 # soundcheck's tuning kit  (sKit)  1.5   Aug-07-2021
 
 Copyright (c) 2021 - Klaus Schulz
