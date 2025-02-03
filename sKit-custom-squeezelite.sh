@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# v1.5_dg-pCP10
+#
 # soundcheck's tuning kit - pCP - sKit-custom-squeezlite.sh
 # custom squeezelite binary build tool for piCorePlayer
 # supporting RPi3 and RPi4 and related CM modules
@@ -182,10 +184,10 @@ env_set() {
     BOOT_MNT=/mnt/mmcblk0p1
     BOOT_DEV=/dev/mmcblk0p1
     ARCH="$(uname -m)"
-    SITE1="https://repo.picoreplayer.org"
-    REPO1="${SITE1}/repo/13.x/$ARCH/tcz"
+    SITE1="https://repo.pcplayer.org"
+    REPO1="${SITE1}/repo/15.x/$ARCH/tcz"
     SITE2="http://picoreplayer.sourceforge.net"
-    REPO2="${SITE2}/tcz_repo/13.x/$ARCH/tcz"
+    REPO2="${SITE2}/tcz_repo/15.x/$ARCH/tcz"
     REPO_SL="https://github.com/klslz/squeezelite.git"
     EXT_BA="sKit-extensions-backup.tar.gz"
     EXTENSIONS="
@@ -430,7 +432,7 @@ glibc_apps
 glibc_gconv
 isl
 mpc
-linux-5.10.y_api_headers
+linux-6.6.y_api_headers.tcz
 binutils
 make
 sed
