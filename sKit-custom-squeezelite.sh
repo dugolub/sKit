@@ -296,11 +296,10 @@ gmp.tcz.dep.pcp
 gmp.tcz.info
 gmp.tcz.md5.txt
 grep.tcz
-grep.tcz.dep
 grep.tcz.dep.pcp
 grep.tcz.info
+grep.tcz.list
 grep.tcz.md5.txt
-grep.tcz.tree
 isl.tcz
 isl.tcz.dep
 isl.tcz.dep.pcp
@@ -321,10 +320,10 @@ libffi_base-dev.tcz
 libffi_base-dev.tcz.dep.pcp
 libffi_base-dev.tcz.info
 libffi_base-dev.tcz.md5.txt
-linux-5.10.y_api_headers.tcz
-linux-5.10.y_api_headers.tcz.dep.pcp
-linux-5.10.y_api_headers.tcz.info
-linux-5.10.y_api_headers.tcz.md5.txt
+linux-6.6.y_api_headers.tcz
+linux-6.6.y_api_headers.tcz.dep.pcp	
+linux-6.6.y_api_headers.tcz.info	
+linux-6.6.y_api_headers.tcz.md5.txt
 m4.tcz
 m4.tcz.dep.pcp
 m4.tcz.info
