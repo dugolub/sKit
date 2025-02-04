@@ -795,6 +795,8 @@ install_squeezelite() {
 
     cd $BASE
 
+    pcp-load -s -l -i libzstd
+
     git checkout squeezelite-sc >>$LOG 2>&1 || out "git checkout sc branch"
     # we need to get the makefiles from the sc branch for master
     cp Makefile.sc* /tmp
