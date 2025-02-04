@@ -402,6 +402,13 @@ pcre.tcz.dep.pcp
 pcre.tcz.info
 pcre.tcz.md5.txt
 pcre.tcz.tree
+pcre2.tcz	
+pcre2.tcz.dep	
+pcre2.tcz.dep.pcp	
+pcre2.tcz.info	
+pcre2.tcz.list	
+pcre2.tcz.md5.txt	
+pcre2.tcz.tree
 pkg-config.tcz
 pkg-config.tcz.dep
 pkg-config.tcz.dep.pcp
