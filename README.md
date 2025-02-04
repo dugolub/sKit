@@ -1,4 +1,4 @@
-v1.5_dg-pCP10
+v1.5_dg-pCP10 (RPi 5)
 
 Install: wget -O- https://raw.githubusercontent.com/dugolub/sKit/dg-pCP10/download 2>/dev/null | sh
 **************************
