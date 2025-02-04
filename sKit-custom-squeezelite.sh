@@ -431,7 +431,15 @@ util-linux_base-dev.tcz.md5.txt
 zlib_base-dev.tcz
 zlib_base-dev.tcz.dep.pcp
 zlib_base-dev.tcz.info
-zlib_base-dev.tcz.md5.txt"
+zlib_base-dev.tcz.md5.txt
+zstd.tcz	
+zstd.tcz.dep	
+zstd.tcz.dep.pcp	
+zstd.tcz.info	
+zstd.tcz.list	
+zstd.tcz.md5.txt	
+zstd.tcz.tree	
+zstd.tcz.zsync"
  
     EXTENSIONS_LOAD="
 gcc_libs
