@@ -320,6 +320,11 @@ libffi_base-dev.tcz
 libffi_base-dev.tcz.dep.pcp
 libffi_base-dev.tcz.info
 libffi_base-dev.tcz.md5.txt
+libzstd.tcz	
+libzstd.tcz.dep.pcp	
+libzstd.tcz.info	
+libzstd.tcz.list	
+libzstd.tcz.md5.txt
 linux-6.6.y_api_headers.tcz
 linux-6.6.y_api_headers.tcz.dep.pcp	
 linux-6.6.y_api_headers.tcz.info	
