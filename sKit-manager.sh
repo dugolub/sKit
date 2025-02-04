@@ -191,7 +191,7 @@ env_set() {
     PERM_BASE="755"
     OWNER_BASE="tc.staff"
    
-    REPO_PCP1="https://repo.pcplayer.org/repo"
+    REPO_PCP1="https://repo.picoreplayer.org/repo"
     REPO_PCP2="http://picoreplayer.sourceforge.net/tcz_repo"
     REPO_PCP="$REPO_PCP1"
     REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP10"
