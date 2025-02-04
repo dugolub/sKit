@@ -787,6 +787,10 @@ download_squeezelite() {
         rm -rf $BASE
     
     fi
+    
+    pcp-load -s -l -i pcre2.tcz
+    pcp-load -s -l -i git
+    
     timeout 240 git clone --quiet "$REPO_SL" $BASE >>$LOG 2>&1 || out "downloading squeezelite sources - rerun the program"
 }
 
