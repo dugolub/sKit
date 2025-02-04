@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# v1.5_dg-pCP10 (RPi 5)
+#
 # soundcheck's tuning kit - pCP - sKit-led-manager.sh
 # enables and disables LEDs on piCorePlayer
 # for RPi4 and related CM modules
@@ -211,7 +213,7 @@ dtoverlay=act-led\
 dtparam=act_led_trigger=none\
 dtparam=act_led_activelow=off\
 ##disable the PWR LED\
-dtparam=pwr_led_trigger=none\
+dtparam=pwr_led_trigger=default-on\
 dtparam=pwr_led_activelow=off\
 ##disable ethernet port LEDs\
 dtparam=eth_led0=4\
