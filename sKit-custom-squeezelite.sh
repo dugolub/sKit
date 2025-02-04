@@ -421,7 +421,8 @@ zlib_base-dev.tcz.dep.pcp
 zlib_base-dev.tcz.info
 zlib_base-dev.tcz.md5.txt"
  
-    EXTENSIONS_LOAD="gcc_libs
+    EXTENSIONS_LOAD="
+gcc_libs
 gcc
 gcc_base-dev
 gcc_libs-dev
