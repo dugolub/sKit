@@ -208,7 +208,7 @@ leds_off() {
 
     echo -e "\tdisabling LEDs"
     sudo sed -i 's/#---End-Custom.*/\###BOF sKit\
-dtoverlay=act-led\
+# dtoverlay=act-led\
 ##disable ACT LED\
 dtparam=act_led_trigger=none\
 dtparam=act_led_activelow=off\
