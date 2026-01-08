@@ -1,12 +1,12 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP10
+# v1.5_dg-pCP11-RPi5
 #
 # soundcheck's tuning kit - pCP - sKit-check.sh
 # checks the tuning status 
-# for RPi4 and related CM modules
+# for RPi5 (adapted from RPi4 version)
 #
-# Latest Update: Aug-07-2021
+# Latest Update: Jan-2026
 #
 #
 # Copyright © 2021 - Klaus Schulz
@@ -149,7 +149,7 @@ env_set() {
     CONFIG=$BOOT_MNT/config.txt
     CMDLINE=$BOOT_MNT/cmdline.txt
     pcpcfg=/usr/local/etc/pcp/pcp.cfg
-    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
+    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11"
 }
 
 
@@ -213,7 +213,17 @@ check_internalaudio() {
 check_hdmi() {
 
     echo -en "\thdmi\t\t\t"
-    sudo tvservice -s | grep -q -i "off" && GREEN "disabled" || RED "enabled"
+    # RPi5: tvservice ne postoji, koristimo fallback provjeru
+    if command -v tvservice >/dev/null 2>&1; then
+        sudo tvservice -s | grep -q -i "off" && GREEN "disabled" || RED "enabled"
+    else
+        # Fallback za RPi5: provjeri konfiguraciju
+        if grep -q "hdmi_force_hotplug=1" $CONFIG 2>/dev/null; then
+            RED "enabled"
+        else
+            YELLOW "check manually"
+        fi
+    fi
 
 }
 
@@ -235,9 +245,21 @@ check_skitweaks() {
 
 check_temperature() {
 
-   temp=$(sudo sudo vcgencmd measure_temp | cut -f 2 -d "=" | cut -f 1 -d "'")
+   # RPi5: vcgencmd može vratiti prazno, koristimo fallback
+   temp=$(sudo vcgencmd measure_temp 2>/dev/null | cut -f 2 -d "=" | cut -f 1 -d "'")
+   
+   # Fallback na sysfs ako vcgencmd ne radi
+   if [[ -z "$temp" ]]; then
+       temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+       if [[ ! -z "$temp" ]]; then
+           temp=$(echo "scale=1; $temp/1000" | bc)
+       fi
+   fi
+   
    echo -en "\tCPU temperature\t\t"
-   if [[ "$(echo $temp'>'50.0 | bc -l)" == "0" ]]; then
+   if [[ -z "$temp" ]]; then
+       YELLOW "N/A"
+   elif [[ "$(echo $temp'>'50.0 | bc -l)" == "0" ]]; then
         GREEN "$temp"
    elif [[ "$(echo $temp'>'55.0 | bc -l)" == "0" ]]; then
         YELLOW "$temp"
@@ -250,9 +272,24 @@ check_temperature() {
 check_cpuclock() {
 
     echo -en "\tCPU clock\t\t"
-    cpu_clock=$(( $(sudo vcgencmd measure_clock arm | cut -d '=' -f 2) / 1000000 ))
-    if [[ "$cpu_clock" == "1500" ]]; then
+    # RPi5: vcgencmd može vratiti prazno, koristimo fallback
+    cpu_clock=$(sudo vcgencmd measure_clock arm 2>/dev/null | cut -d '=' -f 2)
+    
+    if [[ ! -z "$cpu_clock" ]]; then
+        cpu_clock=$(( $cpu_clock / 1000000 ))
+    else
+        # Fallback na sysfs
+        cpu_clock=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
+        if [[ ! -z "$cpu_clock" ]]; then
+            cpu_clock=$(( $cpu_clock / 1000 ))
+        fi
+    fi
+    
+    # RPi5 ima max 2400MHz, RPi4 ima 1500MHz
+    if [[ "$cpu_clock" == "2400" ]] || [[ "$cpu_clock" == "1500" ]]; then
         GREEN "$cpu_clock"
+    elif [[ -z "$cpu_clock" ]]; then
+        YELLOW "N/A"
     else
         RED "$cpu_clock"
     fi
@@ -272,7 +309,18 @@ check_governor() {
 
 check_forcecpu() {
 
-    cpu_clock=$(( $(sudo vcgencmd measure_clock arm | cut -d '=' -f 2) / 1000000 ))
+    # Pokušaj vcgencmd
+    cpu_clock=$(sudo vcgencmd measure_clock arm 2>/dev/null | cut -d '=' -f 2)
+    if [[ ! -z "$cpu_clock" ]]; then
+        cpu_clock=$(( $cpu_clock / 1000000 ))
+    else
+        # Fallback
+        cpu_clock=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
+        if [[ ! -z "$cpu_clock" ]]; then
+            cpu_clock=$(( $cpu_clock / 1000 ))
+        fi
+    fi
+    
     gov="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
     ftu="$(grep -i "^force_turbo=1" $CONFIG)"
 
@@ -382,7 +430,7 @@ check_sKitrev() {
 
 check_bootloader() {
 
-   act_bl=$(sudo vcgencmd bootloader_version | head -1)
+   act_bl=$(sudo vcgencmd bootloader_version 2>/dev/null | head -1)
 }
 
 
