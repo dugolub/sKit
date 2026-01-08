@@ -1,12 +1,21 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP10
+#sKit-manager.sh
+#
+#
 #
 # soundcheck's tuning kit - pCP  - sKit-manager.sh
 # 
-# for RPi4 and related CM modules
+# for RPi3/4/5 and related CM modules
 #
-# Latest Update: Aug-07-2021
+# Latest Update: Jan-2026 (pCP11 compatibility patch)
+# Original: Aug-07-2021
+#
+# CHANGELOG (pCP11 adaptation):
+# - Dynamic TinyCore version detection (16.x for pCP11)
+# - Added RPi5 boot path detection
+# - Fixed isolcpus removal for kernel 6.x
+# - Improved extension handling
 #
 # Copyright © 2021 - Klaus Schulz
 # All rights reserved
@@ -27,8 +36,8 @@
 # If not, see http://www.gnu.org/licenses
 #
 ########################################################################
-VERSION=1.6
-sKit_VERSION=1.5
+VERSION=1.7
+sKit_VERSION=1.6
 
 fname="${0##*/}"
 opts="$@"
@@ -191,10 +200,31 @@ env_set() {
     PERM_BASE="755"
     OWNER_BASE="tc.staff"
    
+    # Detect TinyCore version from pCP
+    if [ -f /usr/local/etc/pcp/pcpversion.cfg ]; then
+        PCP_MAJOR=$(grep "PCPVERS" /usr/local/etc/pcp/pcpversion.cfg | cut -d'"' -f2 | cut -d'.' -f1)
+        
+        # pCP version to TinyCore mapping
+        case "$PCP_MAJOR" in
+            11|12) TC_VER="16.x" ;;  # pCP 11+ = TC16
+            9|10)  TC_VER="14.x" ;;
+            8)     TC_VER="13.x" ;;
+            *)     TC_VER="16.x" ;;  # default to latest
+        esac
+    else
+        # Fallback: detect from kernel version
+        KERN_MAJ=$(uname -r | cut -d'.' -f1)
+        if [ "$KERN_MAJ" -ge "6" ]; then
+            TC_VER="16.x"
+        else
+            TC_VER="13.x"
+        fi
+    fi
+    
     REPO_PCP1="https://repo.picoreplayer.org/repo"
     REPO_PCP2="http://picoreplayer.sourceforge.net/tcz_repo"
     REPO_PCP="$REPO_PCP1"
-    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP10"
+    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
     TIMEOUT=120
 
     sKit="sKit-manager.sh sKit-custom-squeezelite.sh sKit-led-manager.sh sKit-tweaks sKit-src-manager.sh sKit-restore.sh sKit-check.sh"
@@ -203,7 +233,13 @@ env_set() {
 
     BOOT_DEV=/dev/mmcblk0p1 
     BOOT_MNT=/mnt/mmcblk0p1
-    CONFIG=$BOOT_MNT/config.txt
+    
+    # Check for RPi5 boot layout
+    if [ -f /boot/firmware/config.txt ]; then
+        CONFIG=/boot/firmware/config.txt
+    else
+        CONFIG=$BOOT_MNT/config.txt
+    fi
     
     EXT_BA="sKit-extensions-backup.tar.gz"
 }
@@ -319,9 +355,9 @@ select_ext_repo() {
 
     case "$x" in
     
-        1) REPO_PCP=$REPO_PCP1; echo -e "\t   master >> $REPO"; TIMEOUT=300;;
-        2) REPO_PCP=$REPO_PCP2; echo -e "\t   mirror >> $REPO"; TIMEOUT=600;;
-        *) REPO_PCP=$REPO_PCP1; echo -e "\t   master >> $REPO"; TIMEOUT=300;;
+        1) REPO_PCP=$REPO_PCP1; echo -e "\t   master >> $REPO_PCP/${TC_VER}"; TIMEOUT=300;;
+        2) REPO_PCP=$REPO_PCP2; echo -e "\t   mirror >> $REPO_PCP/${TC_VER}"; TIMEOUT=600;;
+        *) REPO_PCP=$REPO_PCP1; echo -e "\t   master >> $REPO_PCP/${TC_VER}"; TIMEOUT=300;;
  
     esac
 }
@@ -330,6 +366,7 @@ select_ext_repo() {
 install_sKit_extensions() {
 
     echo -e "\tinstalling sKit related extensions"
+    echo -e "\t  TinyCore: $TC_VER"
     start=$(date +%s)
     for ext in $EXTENSIONS; do
 
@@ -434,17 +471,24 @@ mount_boot() {
 
     echo -e "\tmounting boot partition"
     echo
-    if [[ ! -d $BOOT_MNT ]]; then 
-
-        sudo mkdir -p $BOOT_MNT
-
-    fi
-    if grep -q "$BOOT_DEV" /proc/mounts; then
     
-        sudo umount -f "$BOOT_DEV"
-
+    # Check for RPi5 boot layout first
+    if [ -f /boot/firmware/config.txt ]; then
+        BOOT_MNT=/boot/firmware
+        CONFIG=/boot/firmware/config.txt
+        echo -e "\t  detected RPi5 boot layout"
+    else
+        # Traditional mount
+        if [[ ! -d $BOOT_MNT ]]; then 
+            sudo mkdir -p $BOOT_MNT
+        fi
+        if grep -q "$BOOT_DEV" /proc/mounts; then
+            sudo umount -f "$BOOT_DEV"
+        fi
+        sudo mount $BOOT_DEV $BOOT_MNT || out "mounting boot"
+        CONFIG=$BOOT_MNT/config.txt
     fi
-    sudo mount $BOOT_DEV $BOOT_MNT || out "mounting boot"
+    
     sleep 1
 }
  
@@ -530,7 +574,14 @@ restore_extensions() {
 remove_isolcpus_mod() {
 
     echo -e "\tremoving cpu isolation mod"
-    sudo sed  -i 's/isolcpus[=][^ ]*//g' $BOOT_MNT/cmdline.txt
+    
+    # Remove isolcpus with any syntax (old and new)
+    if [ -f /boot/firmware/cmdline.txt ]; then
+        sudo sed -i 's/isolcpus[=][^ ]*//g' /boot/firmware/cmdline.txt
+    else
+        sudo sed -i 's/isolcpus[=][^ ]*//g' $BOOT_MNT/cmdline.txt
+    fi
+    
     sed -i "s/^CPUISOL=.*/CPUISOL=\"\"/g" $pcpcfg
 }
 
@@ -600,6 +651,7 @@ menu() {
             set_sKit_log
             sKit_package installation
             backup_extensions
+            select_ext_repo
             install_sKit_extensions
             set_sKit_ashrc
             set_sKit_profile
