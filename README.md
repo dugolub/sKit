@@ -1,7 +1,6 @@
-v1.5_dg-pCP10 (RPi 5)
-
-Install: wget -O- https://raw.githubusercontent.com/dugolub/sKit/dg-pCP10/download 2>/dev/null | sh
-**************************
+# v1.5_dg-pCP11 (RPi 5)
+# Install: wget -O- https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11/download 2>/dev/null | sh
+# **************************
 
 # soundcheck's tuning kit  (sKit)  1.5   Aug-07-2021
 
