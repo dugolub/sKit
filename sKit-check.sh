@@ -1,13 +1,23 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP11-RPi5
+#sKit-check.sh
+#
+#
 #
 # soundcheck's tuning kit - pCP - sKit-check.sh
 # checks the tuning status 
-# for RPi5 (adapted from RPi4 version)
+# for RPi3/4/5 and related CM modules
 #
-# Latest Update: Jan-2026
+# Latest Update: Jan-2026 (pCP11 compatibility patch)
+# Original: Aug-07-2021
 #
+# CHANGELOG (pCP11 adaptation):
+# - Added RPi5 detection via /proc/device-tree/model
+# - Fixed vcgencmd measure_clock (use sysfs on RPi5)
+# - Fixed tvservice (use DRM status on RPi5)
+# - Added kernel version check
+# - Fixed CPU clock expectations (2400MHz for RPi5)
+# - Updated force_turbo check for RPi5
 #
 # Copyright © 2021 - Klaus Schulz
 # All rights reserved
@@ -28,8 +38,8 @@
 # If not, see http://www.gnu.org/licenses
 #
 ########################################################################
-VERSION=1.4
-sKit_VERSION=1.5
+VERSION=1.5
+sKit_VERSION=1.6
 
 fname="${0##*/}"
 opts="$@"
@@ -94,6 +104,22 @@ check_pcp() {
 }
 
 
+detect_rpi_model() {
+
+    # Detect RPi model for hardware-specific checks
+    if [ -f /proc/device-tree/model ]; then
+        RPI_MODEL=$(cat /proc/device-tree/model 2>/dev/null)
+        if echo "$RPI_MODEL" | grep -q "Raspberry Pi 5"; then
+            IS_RPI5=1
+        else
+            IS_RPI5=0
+        fi
+    else
+        IS_RPI5=0
+    fi
+}
+
+
 license() {
 
 	if [[ ! -f $license_accept_flag ]]; then
@@ -146,10 +172,19 @@ env_set() {
     LOG=$LOGDIR/$fname.log
     BOOT_DEV=/dev/mmcblk0p1 
     BOOT_MNT=/mnt/mmcblk0p1
-    CONFIG=$BOOT_MNT/config.txt
-    CMDLINE=$BOOT_MNT/cmdline.txt
+    
+    # RPi5 uses /boot/firmware, but symlink should exist
+    # Check both locations
+    if [ -f /boot/firmware/config.txt ]; then
+        CONFIG=/boot/firmware/config.txt
+        CMDLINE=/boot/firmware/cmdline.txt
+    else
+        CONFIG=$BOOT_MNT/config.txt
+        CMDLINE=$BOOT_MNT/cmdline.txt
+    fi
+    
     pcpcfg=/usr/local/etc/pcp/pcp.cfg
-    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11"
+    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
 }
 
 
@@ -199,7 +234,15 @@ check_leds() {
 check_isolcpus() {
 
     echo -en "\tisolcpus\t\t"
-    grep -q -i 'isolcpus=3' $CMDLINE && GREEN "enabled" || RED "disabled" 
+    
+    # Check for proper kernel 6.x syntax
+    if grep -q -i 'isolcpus=[0-9].*domain.*managed' $CMDLINE; then
+        GREEN "enabled (proper syntax)"
+    elif grep -q -i 'isolcpus=[0-9]' $CMDLINE; then
+        YELLOW "enabled (old syntax, may not work on kernel 6.x)"
+    else
+        RED "disabled"
+    fi
 }
 
 
@@ -213,16 +256,18 @@ check_internalaudio() {
 check_hdmi() {
 
     echo -en "\thdmi\t\t\t"
-    # RPi5: tvservice ne postoji, koristimo fallback provjeru
-    if command -v tvservice >/dev/null 2>&1; then
-        sudo tvservice -s | grep -q -i "off" && GREEN "disabled" || RED "enabled"
-    else
-        # Fallback za RPi5: provjeri konfiguraciju
-        if grep -q "hdmi_force_hotplug=1" $CONFIG 2>/dev/null; then
-            RED "enabled"
+    
+    if [ "$IS_RPI5" = "1" ]; then
+        # RPi5: tvservice doesn't exist, check DRM status
+        if [ -d /sys/class/drm/card1-HDMI-A-1 ]; then
+            status=$(cat /sys/class/drm/card1-HDMI-A-1/status 2>/dev/null || echo "unknown")
+            [ "$status" = "disconnected" ] && GREEN "disabled" || YELLOW "enabled (DRM)"
         else
-            YELLOW "check manually"
+            YELLOW "N/A (no DRM device)"
         fi
+    else
+        # RPi3/4: tvservice works
+        sudo tvservice -s 2>/dev/null | grep -q -i "off" && GREEN "disabled" || RED "enabled"
     fi
 
 }
@@ -245,26 +290,22 @@ check_skitweaks() {
 
 check_temperature() {
 
-   # RPi5: vcgencmd može vratiti prazno, koristimo fallback
-   temp=$(sudo vcgencmd measure_temp 2>/dev/null | cut -f 2 -d "=" | cut -f 1 -d "'")
-   
-   # Fallback na sysfs ako vcgencmd ne radi
-   if [[ -z "$temp" ]]; then
-       temp=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
-       if [[ ! -z "$temp" ]]; then
-           temp=$(echo "scale=1; $temp/1000" | bc)
-       fi
+   if [ "$IS_RPI5" = "1" ]; then
+       # RPi5: read from sysfs (in millidegrees)
+       temp_raw=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null || echo 0)
+       temp=$(echo "scale=1; $temp_raw / 1000" | bc)
+   else
+       # RPi3/4: vcgencmd works
+       temp=$(sudo vcgencmd measure_temp 2>/dev/null | cut -f 2 -d "=" | cut -f 1 -d "'")
    fi
    
    echo -en "\tCPU temperature\t\t"
-   if [[ -z "$temp" ]]; then
-       YELLOW "N/A"
-   elif [[ "$(echo $temp'>'50.0 | bc -l)" == "0" ]]; then
-        GREEN "$temp"
+   if [[ "$(echo $temp'>'50.0 | bc -l)" == "0" ]]; then
+        GREEN "$temp°C"
    elif [[ "$(echo $temp'>'55.0 | bc -l)" == "0" ]]; then
-        YELLOW "$temp"
+        YELLOW "$temp°C"
    else
-        RED "$temp"
+        RED "$temp°C"
    fi
 }
 
@@ -272,26 +313,22 @@ check_temperature() {
 check_cpuclock() {
 
     echo -en "\tCPU clock\t\t"
-    # RPi5: vcgencmd može vratiti prazno, koristimo fallback
-    cpu_clock=$(sudo vcgencmd measure_clock arm 2>/dev/null | cut -d '=' -f 2)
     
-    if [[ ! -z "$cpu_clock" ]]; then
-        cpu_clock=$(( $cpu_clock / 1000000 ))
+    if [ "$IS_RPI5" = "1" ]; then
+        # RPi5: vcgencmd measure_clock doesn't work, read from sysfs
+        cpu_clock_khz=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null || echo 0)
+        cpu_clock=$((cpu_clock_khz / 1000))
+        expected_max=2400
     else
-        # Fallback na sysfs
-        cpu_clock=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
-        if [[ ! -z "$cpu_clock" ]]; then
-            cpu_clock=$(( $cpu_clock / 1000 ))
-        fi
+        # RPi3/4: vcgencmd works
+        cpu_clock=$(( $(sudo vcgencmd measure_clock arm 2>/dev/null | cut -d '=' -f 2) / 1000000 ))
+        expected_max=1500
     fi
     
-    # RPi5 ima max 2400MHz, RPi4 ima 1500MHz
-    if [[ "$cpu_clock" == "2400" ]] || [[ "$cpu_clock" == "1500" ]]; then
-        GREEN "$cpu_clock"
-    elif [[ -z "$cpu_clock" ]]; then
-        YELLOW "N/A"
+    if [[ "$cpu_clock" -ge "$expected_max" ]]; then
+        GREEN "${cpu_clock} MHz"
     else
-        RED "$cpu_clock"
+        RED "${cpu_clock} MHz (expected: ${expected_max})"
     fi
 }
 
@@ -309,18 +346,6 @@ check_governor() {
 
 check_forcecpu() {
 
-    # Pokušaj vcgencmd
-    cpu_clock=$(sudo vcgencmd measure_clock arm 2>/dev/null | cut -d '=' -f 2)
-    if [[ ! -z "$cpu_clock" ]]; then
-        cpu_clock=$(( $cpu_clock / 1000000 ))
-    else
-        # Fallback
-        cpu_clock=$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq 2>/dev/null)
-        if [[ ! -z "$cpu_clock" ]]; then
-            cpu_clock=$(( $cpu_clock / 1000 ))
-        fi
-    fi
-    
     gov="$(cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor)"
     ftu="$(grep -i "^force_turbo=1" $CONFIG)"
 
@@ -430,14 +455,24 @@ check_sKitrev() {
 
 check_bootloader() {
 
-   act_bl=$(sudo vcgencmd bootloader_version 2>/dev/null | head -1)
+   if [ "$IS_RPI5" = "1" ]; then
+       # RPi5: bootloader version works
+       act_bl=$(sudo vcgencmd bootloader_version 2>/dev/null | head -1)
+   else
+       act_bl=$(sudo vcgencmd bootloader_version 2>/dev/null | head -1)
+   fi
 }
 
 
 load_rpi_vc() {
 
-    echo -en "\tloading RPi utils\t\t" >$LOG 2>&1
-    tce-load -sil rpi-vc >$LOG 2>&1
+    echo -en "\tloading RPi utils\t\t"
+    # rpi-vc package may not fully support RPi5
+    if tce-load -sil rpi-vc >>$LOG 2>&1; then
+        echo "OK" >>$LOG
+    else
+        echo "WARNING: rpi-vc load failed (expected on RPi5)" >>$LOG
+    fi
 } 
 
 
@@ -448,6 +483,21 @@ print_pcp_version() {
     echo -e "\tpCP version\t\t\t$pcpvers"
 }
 
+
+check_kernel() {
+
+    kern_ver=$(uname -r)
+    echo -e "\tKernel version\t\t\t$kern_ver"
+    
+    # Warn if not expected kernel for pCP11
+    kern_maj=$(echo $kern_ver | cut -d'.' -f1)
+    if [ "$kern_maj" -lt "6" ]; then
+        echo -en "\tKernel compatibility\t"
+        RED "outdated for pCP11 (expected 6.x)"
+    fi
+}
+
+
 ###main#######################################
 colors
 license
@@ -455,12 +505,14 @@ license
 header
 
 check_pcp
+detect_rpi_model
 env_set
 set_log
 load_rpi_vc
 mount_boot
 
 print_pcp_version
+check_kernel
 check_sKitrev
 
 check_temperature
