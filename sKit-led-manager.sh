@@ -1,13 +1,18 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP10 (RPi 5)
+#sKit-led-manager.sh
+#
 #
 # soundcheck's tuning kit - pCP - sKit-led-manager.sh
 # enables and disables LEDs on piCorePlayer
-# for RPi4 and related CM modules
+# for RPi3/4/5 and related CM modules
 #
-# Latest Update: Aug-07-2021
+# Latest Update: Jan-2026 (pCP11 compatibility patch)
+# Original: Aug-07-2021
 #
+# CHANGELOG (pCP11 adaptation):
+# - Added RPi5 boot path detection (/boot/firmware)
+# - No functional changes (LED dtoverlay same syntax)
 #
 # Copyright © 2021 - Klaus Schulz
 # All rights reserved
@@ -28,8 +33,8 @@
 # If not, see http://www.gnu.org/licenses
 #
 ########################################################################
-VERSION=1.3
-sKit_VERSION=1.5
+VERSION=1.4
+sKit_VERSION=1.6
 
 fname="${0##*/}"
 opts="$@"
@@ -165,7 +170,13 @@ env_set() {
     LOG=$LOGDIR/$fname.log
     BOOT_DEV=/dev/mmcblk0p1 
     BOOT_MNT=/mnt/mmcblk0p1
-    CONFIG=$BOOT_MNT/config.txt
+    
+    # Check for RPi5 boot layout
+    if [ -f /boot/firmware/config.txt ]; then
+        CONFIG=/boot/firmware/config.txt
+    else
+        CONFIG=$BOOT_MNT/config.txt
+    fi
 }
 
 
@@ -189,17 +200,24 @@ check_pcp() {
 mount_boot() {
 
     echo -e "\tmounting boot partition"
-    if [[ ! -d $BOOT_MNT ]]; then 
-
-        sudo mkdir -p $BOOT_MNT
-
-    fi
-    if grep -q "$BOOT_DEV" /proc/mounts; then
     
-        sudo umount -f "$BOOT_DEV"
-
+    # Check for RPi5 boot layout first
+    if [ -f /boot/firmware/config.txt ]; then
+        BOOT_MNT=/boot/firmware
+        CONFIG=/boot/firmware/config.txt
+        echo -e "\t  detected RPi5 boot layout"
+    else
+        # Traditional mount
+        if [[ ! -d $BOOT_MNT ]]; then 
+            sudo mkdir -p $BOOT_MNT
+        fi
+        if grep -q "$BOOT_DEV" /proc/mounts; then
+            sudo umount -f "$BOOT_DEV"
+        fi
+        sudo mount $BOOT_DEV $BOOT_MNT || out "mounting boot"
+        CONFIG=$BOOT_MNT/config.txt
     fi
-    sudo mount $BOOT_DEV $BOOT_MNT || out "mounting boot"
+    
     sleep 1
 }
  
@@ -208,12 +226,12 @@ leds_off() {
 
     echo -e "\tdisabling LEDs"
     sudo sed -i 's/#---End-Custom.*/\###BOF sKit\
-# dtoverlay=act-led\
+dtoverlay=act-led\
 ##disable ACT LED\
 dtparam=act_led_trigger=none\
 dtparam=act_led_activelow=off\
 ##disable the PWR LED\
-dtparam=pwr_led_trigger=default-on\
+dtparam=pwr_led_trigger=none\
 dtparam=pwr_led_activelow=off\
 ##disable ethernet port LEDs\
 dtparam=eth_led0=4\
