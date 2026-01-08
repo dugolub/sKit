@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP10
+# v1.5_dg-pCP11
 #
 # soundcheck's tuning kit - pCP  - download sKit manager
 # 
@@ -96,7 +96,7 @@ env_set() {
     BINDIR=/usr/local/bin
     BIN=sKit-manager.sh 
     PERM_BIN="755"
-    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP10"
+    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11"
     TIMEOUT=120
 }
 
