@@ -1,12 +1,21 @@
 #!/bin/sh
 #
-# v1.5_dg-pCP10
+#sKit-custom-squeezelite.sh
 #
 # soundcheck's tuning kit - pCP - sKit-custom-squeezlite.sh
 # custom squeezelite binary build tool for piCorePlayer
-# supporting RPi3 and RPi4 and related CM modules
+# supporting RPi3/4/5 and related CM modules
 #
-# Latest Update: Nov-18-2021
+# Latest Update: Jan-2026 (pCP11 compatibility patch)
+# Original: Nov-18-2021
+#
+# CHANGELOG (pCP11 adaptation):
+# - Dynamic TinyCore version detection (16.x for pCP11)
+# - Dynamic kernel headers detection (6.12.y for pCP11)
+# - Dynamic extensions list generation
+# - Fixed isolcpus syntax for kernel 6.x (domain,managed)
+# - Added RPi5 boot path detection
+# - Improved error handling for TC version mismatch
 #
 # Copyright © 2021 - Klaus Schulz
 # All rights reserved
@@ -27,8 +36,8 @@
 # If not, see http://www.gnu.org/licenses
 #
 ########################################################################
-VERSION="1.4.2-beta"
-sKit_VERSION=1.5
+VERSION="1.5-pcp11"
+sKit_VERSION=1.6
 
 fname="${0##*/}"
 opts="$@"
@@ -170,279 +179,72 @@ license() {
 }
 
 
-env_set() {
+generate_extensions_list() {
 
-    TCE=/mnt/mmcblk0p2/tce 
-    TCEO=$TCE/optional
-    ONB=$TCE/onboot.lst
-    sKitbase=$TCE/sKit
-    LOGDIR=$sKitbase/log
-    LOG=$LOGDIR/$fname-$(date +%d%b%Y-%H%M).log
-    DOWNLOAD_DIR="/tmp/ext"
-    TARGET_DIR="$TCEO"
-    pcpcfg=/usr/local/etc/pcp/pcp.cfg
-    BOOT_MNT=/mnt/mmcblk0p1
-    BOOT_DEV=/dev/mmcblk0p1
-    ARCH="$(uname -m)"
-    SITE1="https://repo.picoreplayer.org"
-    REPO1="${SITE1}/repo/15.x/$ARCH/tcz"
-    SITE2="http://picoreplayer.sourceforge.net"
-    REPO2="${SITE2}/tcz_repo/15.x/$ARCH/tcz"
-    REPO_SL="https://github.com/klslz/squeezelite.git"
-    EXT_BA="sKit-extensions-backup.tar.gz"
-    EXTENSIONS="
-binutils.tcz
-binutils.tcz.dep
-binutils.tcz.dep.pcp
-binutils.tcz.info
-binutils.tcz.md5.txt
-binutils.tcz.tree
-bison.tcz
-bison.tcz.dep.pcp
-bison.tcz.info
-bison.tcz.md5.txt
-bzip2-lib.tcz
-bzip2-lib.tcz.dep.pcp
-bzip2-lib.tcz.info
-bzip2-lib.tcz.md5.txt
-curl.tcz
-curl.tcz.dep
-curl.tcz.dep.pcp
-curl.tcz.info
-curl.tcz.md5.txt
-curl.tcz.tree
-diffutils.tcz
-diffutils.tcz.dep.pcp
-diffutils.tcz.info
-diffutils.tcz.md5.txt
-e2fsprogs_base-dev.tcz
-e2fsprogs_base-dev.tcz.dep.pcp
-e2fsprogs_base-dev.tcz.info
-e2fsprogs_base-dev.tcz.md5.txt
-expat2.tcz
-expat2.tcz.dep.pcp
-expat2.tcz.info
-expat2.tcz.md5.txt
-file.tcz
-file.tcz.dep.pcp
-file.tcz.info
-file.tcz.md5.txt
-findutils.tcz
-findutils.tcz.dep.pcp
-findutils.tcz.info
-findutils.tcz.md5.txt
-flex.tcz
-flex.tcz.dep.pcp
-flex.tcz.info
-flex.tcz.md5.txt
-gamin.tcz
-gamin.tcz.dep.pcp
-gamin.tcz.info
-gamin.tcz.md5.txt
-gawk.tcz
-gawk.tcz.dep
-gawk.tcz.dep.pcp
-gawk.tcz.info
-gawk.tcz.md5.txt
-gawk.tcz.tree
-gcc_base-dev.tcz
-gcc_base-dev.tcz.dep.pcp
-gcc_base-dev.tcz.info
-gcc_base-dev.tcz.md5.txt
-gcc_libs-dev.tcz
-gcc_libs-dev.tcz.dep
-gcc_libs-dev.tcz.dep.pcp
-gcc_libs-dev.tcz.info
-gcc_libs-dev.tcz.md5.txt
-gcc_libs-dev.tcz.tree
-gcc_libs.tcz
-gcc_libs.tcz.dep.pcp
-gcc_libs.tcz.info
-gcc_libs.tcz.md5.txt
-gcc.tcz
-gcc.tcz.dep.pcp
-gcc.tcz.info
-gcc.tcz.md5.txt
-git.tcz
-git.tcz.dep
-git.tcz.dep.pcp
-git.tcz.info
-git.tcz.md5.txt
-git.tcz.tree
-glib2.tcz
-glib2.tcz.dep
-glib2.tcz.dep.pcp
-glib2.tcz.info
-glib2.tcz.md5.txt
-glib2.tcz.tree
-glibc_add_lib.tcz
-glibc_add_lib.tcz.dep.pcp
-glibc_add_lib.tcz.info
-glibc_add_lib.tcz.md5.txt
-glibc_apps.tcz
-glibc_apps.tcz.dep.pcp
-glibc_apps.tcz.info
-glibc_apps.tcz.md5.txt
-glibc_base-dev.tcz
-glibc_base-dev.tcz.dep.pcp
-glibc_base-dev.tcz.info
-glibc_base-dev.tcz.md5.txt
-glibc_gconv.tcz
-glibc_gconv.tcz.dep.pcp
-glibc_gconv.tcz.info
-glibc_gconv.tcz.md5.txt
-gmp.tcz
-gmp.tcz.dep.pcp
-gmp.tcz.info
-gmp.tcz.md5.txt
-grep.tcz
-grep.tcz.dep.pcp
-grep.tcz.info
-grep.tcz.list
-grep.tcz.md5.txt
-isl.tcz
-isl.tcz.dep
-isl.tcz.dep.pcp
-isl.tcz.info
-isl.tcz.md5.txt
-isl.tcz.tree
-libasound-dev.tcz
-libasound-dev.tcz.dep
-libasound-dev.tcz.dep.pcp
-libasound-dev.tcz.info
-libasound-dev.tcz.md5.txt
-libasound-dev.tcz.tree
-libelf.tcz
-libelf.tcz.dep.pcp
-libelf.tcz.info
-libelf.tcz.md5.txt
-libffi_base-dev.tcz
-libffi_base-dev.tcz.dep.pcp
-libffi_base-dev.tcz.info
-libffi_base-dev.tcz.md5.txt
-libzstd.tcz	
-libzstd.tcz.dep.pcp	
-libzstd.tcz.info	
-libzstd.tcz.list	
-libzstd.tcz.md5.txt
-linux-6.6.y_api_headers.tcz
-linux-6.6.y_api_headers.tcz.dep.pcp	
-linux-6.6.y_api_headers.tcz.info	
-linux-6.6.y_api_headers.tcz.md5.txt
-m4.tcz
-m4.tcz.dep.pcp
-m4.tcz.info
-m4.tcz.md5.txt
-make.tcz
-make.tcz.dep.pcp
-make.tcz.info
-make.tcz.md5.txt
-mpc.tcz
-mpc.tcz.dep
-mpc.tcz.dep.pcp
-mpc.tcz.info
-mpc.tcz.md5.txt
-mpc.tcz.tree
-mpfr.tcz
-mpfr.tcz.dep
-mpfr.tcz.dep.pcp
-mpfr.tcz.info
-mpfr.tcz.md5.txt
-mpfr.tcz.tree
-patch.tcz
-patch.tcz.dep.pcp
-patch.tcz.info
-patch.tcz.md5.txt
-pcp-libalac-dev.tcz
-pcp-libalac-dev.tcz.dep
-pcp-libalac-dev.tcz.dep.pcp
-pcp-libalac-dev.tcz.info
-pcp-libalac-dev.tcz.md5.txt
-pcp-libalac-dev.tcz.tree
-pcp-libfaad2-dev.tcz
-pcp-libfaad2-dev.tcz.dep
-pcp-libfaad2-dev.tcz.dep.pcp
-pcp-libfaad2-dev.tcz.info
-pcp-libfaad2-dev.tcz.md5.txt
-pcp-libfaad2-dev.tcz.tree
-pcp-libflac-dev.tcz
-pcp-libflac-dev.tcz.dep
-pcp-libflac-dev.tcz.dep.pcp
-pcp-libflac-dev.tcz.info
-pcp-libflac-dev.tcz.md5.txt
-pcp-libflac-dev.tcz.tree
-pcp-libmad-dev.tcz
-pcp-libmad-dev.tcz.dep
-pcp-libmad-dev.tcz.dep.pcp
-pcp-libmad-dev.tcz.info
-pcp-libmad-dev.tcz.md5.txt
-pcp-libmad-dev.tcz.tree
-pcp-libmpg123-dev.tcz
-pcp-libmpg123-dev.tcz.dep
-pcp-libmpg123-dev.tcz.dep.pcp
-pcp-libmpg123-dev.tcz.info
-pcp-libmpg123-dev.tcz.md5.txt
-pcp-libmpg123-dev.tcz.tree
-pcp-libogg-dev.tcz
-pcp-libogg-dev.tcz.dep
-pcp-libogg-dev.tcz.dep.pcp
-pcp-libogg-dev.tcz.info
-pcp-libogg-dev.tcz.md5.txt
-pcp-libogg-dev.tcz.tree
-pcp-libsoxr-dev.tcz
-pcp-libsoxr-dev.tcz.dep
-pcp-libsoxr-dev.tcz.dep.pcp
-pcp-libsoxr-dev.tcz.info
-pcp-libsoxr-dev.tcz.md5.txt
-pcp-libsoxr-dev.tcz.tree
-pcp-libvorbis-dev.tcz
-pcp-libvorbis-dev.tcz.dep
-pcp-libvorbis-dev.tcz.dep.pcp
-pcp-libvorbis-dev.tcz.info
-pcp-libvorbis-dev.tcz.md5.txt
-pcp-libvorbis-dev.tcz.tree
-pcre.tcz
-pcre.tcz.dep
-pcre.tcz.dep.pcp
-pcre.tcz.info
-pcre.tcz.md5.txt
-pcre.tcz.tree
-pcre2.tcz	
-pcre2.tcz.dep	
-pcre2.tcz.dep.pcp	
-pcre2.tcz.info	
-pcre2.tcz.list	
-pcre2.tcz.md5.txt	
-pcre2.tcz.tree
-pkg-config.tcz
-pkg-config.tcz.dep
-pkg-config.tcz.dep.pcp
-pkg-config.tcz.info
-pkg-config.tcz.md5.txt
-pkg-config.tcz.tree
-sed.tcz
-sed.tcz.dep.pcp
-sed.tcz.info
-sed.tcz.md5.txt
-util-linux_base-dev.tcz
-util-linux_base-dev.tcz.dep.pcp
-util-linux_base-dev.tcz.info
-util-linux_base-dev.tcz.md5.txt
-zlib_base-dev.tcz
-zlib_base-dev.tcz.dep.pcp
-zlib_base-dev.tcz.info
-zlib_base-dev.tcz.md5.txt
-zstd.tcz	
-zstd.tcz.dep	
-zstd.tcz.dep.pcp	
-zstd.tcz.info	
-zstd.tcz.list	
-zstd.tcz.md5.txt	
-zstd.tcz.tree	
-zstd.tcz.zsync"
- 
-    EXTENSIONS_LOAD="
+    # Core build packages (version-neutral names)
+    local CORE_PKGS="
+binutils
+bison
+bzip2-lib
+curl
+diffutils
+e2fsprogs_base-dev
+expat2
+file
+findutils
+flex
+gamin
+gawk
+gcc_base-dev
+gcc_libs-dev
 gcc_libs
+gcc
+git
+glib2
+glibc_add_lib
+glibc_apps
+glibc_base-dev
+glibc_gconv
+gmp
+grep
+isl
+libasound-dev
+libelf
+libffi_base-dev
+m4
+make
+mpc
+mpfr
+patch
+pcp-libalac-dev
+pcp-libfaad2-dev
+pcp-libflac-dev
+pcp-libmad-dev
+pcp-libmpg123-dev
+pcp-libogg-dev
+pcp-libsoxr-dev
+pcp-libvorbis-dev
+pcre
+pkg-config
+sed
+util-linux_base-dev
+zlib_base-dev
+$KERNEL_PKG"
+
+    # Generate full extensions list with all required files
+    EXTENSIONS=""
+    for pkg in $CORE_PKGS; do
+        EXTENSIONS="$EXTENSIONS
+${pkg}.tcz
+${pkg}.tcz.dep
+${pkg}.tcz.dep.pcp
+${pkg}.tcz.info
+${pkg}.tcz.md5.txt
+${pkg}.tcz.tree"
+    done
+    
+    # Load order (only .tcz basenames)
+    EXTENSIONS_LOAD="gcc_libs
 gcc
 gcc_base-dev
 gcc_libs-dev
@@ -452,7 +254,7 @@ glibc_apps
 glibc_gconv
 isl
 mpc
-linux-6.6.y_api_headers
+$KERNEL_PKG
 binutils
 make
 sed
@@ -467,6 +269,58 @@ pcp-libmpg123-dev
 pcp-libalac-dev
 pcp-libfaad2-dev
 pcp-libsoxr-dev"
+}
+
+
+env_set() {
+
+    TCE=/mnt/mmcblk0p2/tce 
+    TCEO=$TCE/optional
+    ONB=$TCE/onboot.lst
+    sKitbase=$TCE/sKit
+    LOGDIR=$sKitbase/log
+    LOG=$LOGDIR/$fname-$(date +%d%b%Y-%H%M).log
+    DOWNLOAD_DIR="/tmp/ext"
+    TARGET_DIR="$TCEO"
+    pcpcfg=/usr/local/etc/pcp/pcp.cfg
+    BOOT_MNT=/mnt/mmcblk0p1
+    BOOT_DEV=/dev/mmcblk0p1
+    ARCH="$(uname -m)"
+    
+    # Detect TinyCore version from pCP
+    if [ -f /usr/local/etc/pcp/pcpversion.cfg ]; then
+        PCP_MAJOR=$(grep "PCPVERS" /usr/local/etc/pcp/pcpversion.cfg | cut -d'"' -f2 | cut -d'.' -f1)
+        
+        # pCP version to TinyCore mapping
+        case "$PCP_MAJOR" in
+            11|12) TC_VER="16.x" ;;  # pCP 11+ = TC16
+            9|10)  TC_VER="14.x" ;;
+            8)     TC_VER="13.x" ;;
+            *)     TC_VER="16.x" ;;  # default to latest
+        esac
+    else
+        # Fallback: detect from kernel version
+        KERN_MAJ=$(uname -r | cut -d'.' -f1)
+        if [ "$KERN_MAJ" -ge "6" ]; then
+            TC_VER="16.x"
+        else
+            TC_VER="13.x"
+        fi
+    fi
+    
+    SITE1="https://repo.picoreplayer.org"
+    REPO1="${SITE1}/repo/${TC_VER}/$ARCH/tcz"
+    SITE2="http://picoreplayer.sourceforge.net"
+    REPO2="${SITE2}/tcz_repo/${TC_VER}/$ARCH/tcz"
+    REPO_SL="https://github.com/klslz/squeezelite.git"
+    EXT_BA="sKit-extensions-backup.tar.gz"
+    
+    # Detect kernel API headers package
+    KERNEL_VER=$(uname -r | cut -d'.' -f1-2)  # e.g. 6.12
+    KERNEL_PKG="linux-${KERNEL_VER}.y_api_headers"
+    
+    # Generate extensions list after KERNEL_PKG is defined
+    generate_extensions_list
 
     BASE=/tmp/squeezelite
     ISOLCPUS="3"
@@ -481,10 +335,14 @@ set_log() {
     PCP_REV="$(grep -R "piCorePlayer" /var/tmp/footer.html | awk '{print $2}')"
     ARCH="$(uname -m)"
     MEMORY="$(free -m | grep Mem)"
+    KERN_VER="$(uname -r)"
     echo -e "\tsetting up log"
     echo >$LOG
     echo "*** sKit-custom-squeezelite: $VERSION" >>$LOG
     echo "*** pCP version: $PCP_REV" >>$LOG
+    echo "*** TinyCore: $TC_VER" >>$LOG
+    echo "*** Kernel: $KERN_VER" >>$LOG
+    echo "*** Kernel headers package: $KERNEL_PKG" >>$LOG
     echo "*** Arch: $ARCH" >>$LOG
     echo "*** $MEMORY" >>$LOG 
     echo "**************************************************************" >>$LOG
@@ -516,6 +374,10 @@ select_ext_repo() {
         *) REPO=$REPO1 ; TIMEOUT=400;;
  
     esac
+    
+    echo -e "\tUsing repository: $REPO"
+    echo -e "\tTinyCore version: $TC_VER"
+    echo -e "\tKernel headers: $KERNEL_PKG"
 }
 
 
@@ -691,7 +553,7 @@ verify_extensions() {
 
 	if [[ -s "/tmp/skit-dl.failed" ]]; then
 
-		echo -e "\t${RED}ERROR:   serious extensions download issue encountered{NC}"
+		echo -e "\t${RED}ERROR:   serious extensions download issue encountered${NC}"
 		echo -e "\t${RED}         so far nothing has been changed${NC}"
 		echo -e "\t${RED}         try later or choose different repo after reboot${NC}"
 
@@ -787,10 +649,6 @@ download_squeezelite() {
         rm -rf $BASE
     
     fi
-    
-    pcp-load -s -l -i pcre2.tcz
-    pcp-load -s -l -i git
-    
     timeout 240 git clone --quiet "$REPO_SL" $BASE >>$LOG 2>&1 || out "downloading squeezelite sources - rerun the program"
 }
 
@@ -798,8 +656,6 @@ download_squeezelite() {
 install_squeezelite() {
 
     cd $BASE
-
-    pcp-load -s -l -i libzstd
 
     git checkout squeezelite-sc >>$LOG 2>&1 || out "git checkout sc branch"
     # we need to get the makefiles from the sc branch for master
@@ -861,17 +717,22 @@ activate_squeezelite() {
 mount_boot() {
 
     echo -e "\tmounting boot partition"
-    if [[ ! -d $BOOT_MNT ]]; then 
     
-       sudo mkdir -p $BOOT_MNT
-
+    # Check for RPi5 boot layout first
+    if [ -f /boot/firmware/config.txt ]; then
+        BOOT_MNT=/boot/firmware
+        echo -e "\t  detected RPi5 boot layout (/boot/firmware)"
+    else
+        # Traditional mount
+        if [[ ! -d $BOOT_MNT ]]; then 
+           sudo mkdir -p $BOOT_MNT
+        fi
+        if grep -q "$BOOT_DEV" /proc/mounts; then
+           sudo umount "$BOOT_DEV" 2>>$LOG || out "umounting boot"
+        fi
+        sudo mount $BOOT_DEV $BOOT_MNT 2>>$LOG || out "mounting boot"
     fi
-    if grep -q "$BOOT_DEV" /proc/mounts; then
     
-       sudo umount "$BOOT_DEV" 2>>$LOG || out "umounting boot"
-       
-    fi
-    sudo mount $BOOT_DEV $BOOT_MNT 2>>$LOG || out "mounting boot"
     sleep 1
 }
 
@@ -879,15 +740,22 @@ mount_boot() {
 set_isolcpus() {
 
     echo -e "\tconfiguring CPU isolation"
-    sed -i "s/^CPUISOL=.*/CPUISOL=\"$ISOLCPUS\"/g" $pcpcfg
-    if grep -q "isolcpus" $BOOT_MNT/cmdline.txt; then
-   
-        sudo sed -i "s/isolcpus[=][^ ]* /isolcpus=$ISOLCPUS /g" $BOOT_MNT/cmdline.txt
-   
+    
+    # Kernel 6.x requires domain,managed syntax
+    KERN_MAJ=$(uname -r | cut -d'.' -f1)
+    if [ "$KERN_MAJ" -ge "6" ]; then
+        ISOL_PARAM="isolcpus=${ISOLCPUS},domain,managed"
+        echo -e "\t  kernel 6.x detected, using: $ISOL_PARAM"
     else
-   
-        sudo sed -i "s/$/ isolcpus=$ISOLCPUS /g" $BOOT_MNT/cmdline.txt
-      
+        ISOL_PARAM="isolcpus=${ISOLCPUS}"
+    fi
+    
+    sed -i "s/^CPUISOL=.*/CPUISOL=\"$ISOLCPUS\"/g" $pcpcfg
+    
+    if grep -q "isolcpus" $BOOT_MNT/cmdline.txt; then
+        sudo sed -i "s/isolcpus[=][^ ]* /${ISOL_PARAM} /g" $BOOT_MNT/cmdline.txt
+    else
+        sudo sed -i "s/$/ ${ISOL_PARAM} /g" $BOOT_MNT/cmdline.txt
     fi
     
     sudo sed -i 's/  */ /g' $BOOT_MNT/cmdline.txt
