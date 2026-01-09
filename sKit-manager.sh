@@ -224,7 +224,7 @@ env_set() {
     REPO_PCP1="https://repo.picoreplayer.org/repo"
     REPO_PCP2="http://picoreplayer.sourceforge.net/tcz_repo"
     REPO_PCP="$REPO_PCP1"
-    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
+    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11"
     TIMEOUT=120
 
     sKit="sKit-manager.sh sKit-custom-squeezelite.sh sKit-led-manager.sh sKit-tweaks sKit-src-manager.sh sKit-restore.sh sKit-check.sh"
