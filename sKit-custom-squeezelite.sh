@@ -309,7 +309,14 @@ env_set() {
     REPO1="${SITE1}/repo/${TC_VER}/$ARCH/tcz"
     SITE2="http://picoreplayer.sourceforge.net"
     REPO2="${SITE2}/tcz_repo/${TC_VER}/$ARCH/tcz"
-    REPO_SL="https://github.com/klslz/squeezelite.git"
+    
+    # Squeezelite repository
+    # NOTE: Original klslz/squeezelite may be unavailable
+    # Fallback to official ralph-irving squeezelite
+    REPO_SL_PRIMARY="https://github.com/klslz/squeezelite.git"
+    REPO_SL_FALLBACK="https://github.com/ralph-irving/squeezelite.git"
+    REPO_SL="$REPO_SL_PRIMARY"
+    
     EXT_BA="sKit-extensions-backup.tar.gz"
     
     # Detect kernel API headers package
@@ -637,11 +644,22 @@ verify_extensions() {
 load_extensions() {
 
     echo -e "\tloading extensions"
+    
+    # Load critical dependencies first (needed for git clone)
+    echo -e "\t  loading git dependencies..."
+    for dep in expat2 curl; do
+        pcp-load -s -l -i "$dep" >>$LOG 2>&1
+    done
+    
+    # Load all other extensions
     echo "$EXTENSIONS_LOAD" | while IFS= read -r ext; do
-
-                            pcp-load -s -l -i "$ext" >>$LOG 2>&1
-
-                         done 
+        [ -n "$ext" ] && pcp-load -s -l -i "$ext" >>$LOG 2>&1
+    done
+    
+    # Verify git works with HTTPS
+    if ! git ls-remote https://github.com 2>&1 | grep -q "HEAD"; then
+        echo -e "\t${RED}WARNING: git HTTPS may not work properly${NC}" | tee -a $LOG
+    fi
 }
 
 
@@ -649,11 +667,32 @@ download_squeezelite() {
 
     echo -e "\tdownloading squeezelite sources"
     if [[ -d "$BASE" ]]; then
-    
         rm -rf $BASE
-    
     fi
-    timeout 240 git clone --quiet "$REPO_SL" $BASE >>$LOG 2>&1 || out "downloading squeezelite sources - rerun the program"
+    
+    echo -e "\t  (this may take several minutes...)"
+    
+    # Try primary repository first
+    echo -e "\t  trying: $REPO_SL"
+    timeout 600 git clone "$REPO_SL" $BASE >>$LOG 2>&1
+    
+    if [ $? -ne 0 ]; then
+        echo -e "\t${YELLOW}Primary repo failed, trying fallback...${NC}"
+        REPO_SL="$REPO_SL_FALLBACK"
+        echo -e "\t  trying: $REPO_SL"
+        timeout 600 git clone "$REPO_SL" $BASE >>$LOG 2>&1
+        
+        if [ $? -ne 0 ]; then
+            echo -e "\t${RED}Git clone failed from both repositories${NC}"
+            echo -e "\t${YELLOW}Tried:${NC}"
+            echo -e "\t  - $REPO_SL_PRIMARY"
+            echo -e "\t  - $REPO_SL_FALLBACK"
+            echo -e "\t${YELLOW}Check log: $LOG${NC}"
+            out "downloading squeezelite sources - check network/log"
+        else
+            echo -e "\t${GREEN}Using fallback repository${NC}"
+        fi
+    fi
 }
 
 
@@ -661,14 +700,19 @@ install_squeezelite() {
 
     cd $BASE
 
-    git checkout squeezelite-sc >>$LOG 2>&1 || out "git checkout sc branch"
-    # we need to get the makefiles from the sc branch for master
-    cp Makefile.sc* /tmp
+    # Check if squeezelite-sc branch exists (soundcheck fork)
+    if git branch -r | grep -q "origin/squeezelite-sc"; then
+        echo -e "\t  using soundcheck branch"
+        git checkout squeezelite-sc >>$LOG 2>&1 || out "git checkout sc branch"
+        # we need to get the makefiles from the sc branch for master
+        cp Makefile.sc* /tmp 2>/dev/null || echo "No Makefile.sc found, using default" >>$LOG
+    else
+        echo -e "\t  ${YELLOW}soundcheck branch not found, using master${NC}"
+        echo -e "\t  ${YELLOW}Note: will use standard build process${NC}"
+    fi
 
-    if [[ "$1" == "master" ]]; then
-   
+    if [[ "$1" == "master" ]] || [[ ! -f /tmp/Makefile.sc-rpi-ux-$variant ]]; then
         git checkout master >>$LOG 2>&1 || out "git checkout master branch"
-
     fi
     
     #get git commit id as attachment to version string
@@ -679,7 +723,22 @@ install_squeezelite() {
     sed -i "/#define MICRO_VERSION/a #define CUSTOM_VERSION -$VID-$GIT_COMMIT_ID" $BASE/squeezelite.h
 
     echo -e "\tbuilding"
-    make -C $BASE -f /tmp/Makefile.sc-rpi-ux-$variant >>$LOG 2>&1 || out "compiling binary"
+    
+    # Try soundcheck makefile first, fallback to standard build
+    if [ -f /tmp/Makefile.sc-rpi-ux-$variant ]; then
+        make -C $BASE -f /tmp/Makefile.sc-rpi-ux-$variant >>$LOG 2>&1
+    else
+        echo -e "\t  ${YELLOW}Using standard build (no soundcheck makefile)${NC}"
+        # Standard squeezelite build for ARM
+        OPTS="-DLINKALL -DFFMPEG -DRESAMPLE -DDSD -DIR"
+        export CFLAGS="-O3 -march=armv8-a -mcpu=cortex-a76 -mtune=cortex-a76"
+        make -C $BASE OPTS="$OPTS" >>$LOG 2>&1
+    fi
+    
+    if [ $? -ne 0 ]; then
+        out "compiling binary - check log: $LOG"
+    fi
+    
     strip -x $BASE/squeezelite
     echo -e "\tinstalling"
     sudo install --mode=755 -o root -g root $BASE/squeezelite $TCE/squeezelite-custom || out "installing binary"
@@ -798,7 +857,10 @@ INSTALL() {
     if [[ "$DOWNLOAD_SUCCESS" == "true" ]]; then
 		verify_extensions
 	fi
+	line
+	echo -e "\tloading extensions (this may take a few minutes...)"
 	load_extensions
+	echo -e "\t${GREEN}extensions loaded${NC}"
     line
     download_squeezelite
     install_squeezelite $branch
