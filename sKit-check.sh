@@ -184,7 +184,7 @@ env_set() {
     fi
     
     pcpcfg=/usr/local/etc/pcp/pcp.cfg
-    REPO_sKit="https://raw.githubusercontent.com/klslz/sKit/master"
+    REPO_sKit="https://raw.githubusercontent.com/dugolub/sKit/dg-pCP11"
 }
 
 
