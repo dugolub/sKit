@@ -211,6 +211,7 @@ isl
 libasound-dev
 libelf
 libffi_base-dev
+libzstd
 m4
 make
 mpc
@@ -241,21 +242,32 @@ ${pkg}.tcz.md5.txt"
     done
     
     # Load order (only .tcz basenames)
-    EXTENSIONS_LOAD="gcc_libs
-gcc
+    # IMPORTANT: Order matters - dependencies must be loaded first
+    EXTENSIONS_LOAD="libzstd
+gmp
+mpfr
+mpc
+isl
+gcc_libs
 gcc_base-dev
 gcc_libs-dev
 glibc_base-dev
 glibc_add_lib
 glibc_apps
 glibc_gconv
-isl
-mpc
 $KERNEL_PKG
 binutils
 make
 sed
 grep
+bison
+flex
+m4
+patch
+gawk
+file
+findutils
+diffutils
 git
 libasound-dev
 pcp-libogg-dev
@@ -265,7 +277,8 @@ pcp-libmad-dev
 pcp-libmpg123-dev
 pcp-libalac-dev
 pcp-libfaad2-dev
-pcp-libsoxr-dev"
+pcp-libsoxr-dev
+gcc"
 }
 
 
